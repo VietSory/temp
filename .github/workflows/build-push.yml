@@ -1,85 +1,78 @@
-# Build and push Docker image to GitHub Container Registry
-name: Build and Push Image
+name: Build Scan Sign
 
 on:
   push:
     branches:
-      - main
+      - lab-2-1-eso
     paths:
-      - 'src/api/**'
-      - '.github/workflows/build-push.yml'
+      - Dockerfile
+      - app.py
+      - signing/cosign.pub
+      - .github/workflows/build-push.yml
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/w10-api
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  build-and-push:
+  build-scan-sign:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Calculate semantic version
-        id: semver
-        uses: paulhatch/semantic-version@v5.4.0
-        with:
-          tag_prefix: "v"
-          major_pattern: "(BREAKING CHANGE:|!:)"
-          minor_pattern: "^feat"
-          version_format: "${major}.${minor}.${patch}"
-          bump_each_commit: false
+      - name: Set image name
+        shell: bash
+        run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE=ghcr.io/${OWNER_LC}/w10-api:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
-      - name: Log in to Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Build image
+        shell: bash
+        run: |
+          docker build -t "${IMAGE}" .
+
+      - name: Trivy scan HIGH/CRITICAL
+        uses: aquasecurity/trivy-action@0.35.0
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=raw,value=${{ steps.semver.outputs.version }}
-            type=sha,prefix=v${{ steps.semver.outputs.version }}-
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          ignore-unfixed: false
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./src/api
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Update rollout.yaml with new version
+      - name: Push image
+        shell: bash
         run: |
-          sed -i "s|image: ghcr.io/.*/w10-api:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.semver.outputs.version }}|g" app-api/rollout.yaml
-          sed -i "s|value: \"v.*\"|value: \"v${{ steps.semver.outputs.version }}\"|g" app-api/rollout.yaml
+          docker push "${IMAGE}"
+          DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}")"
+          echo "IMAGE_DIGEST=${DIGEST}" >> "$GITHUB_ENV"
+          echo "Pushed digest: ${DIGEST}"
 
-      - name: Commit and push version update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add app-api/rollout.yaml
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: bump version to v${{ steps.semver.outputs.version }}"
-            git push
-          fi
+      - name: Install cosign
+        uses: sigstore/cosign-installer@main
 
-      - name: Create git tag
+      - name: Sign image digest
+        shell: bash
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
         run: |
-          git tag v${{ steps.semver.outputs.version }}
-          git push origin v${{ steps.semver.outputs.version }}
+          printf '%s' "${COSIGN_PRIVATE_KEY}" > cosign.key
+          cosign sign --yes --key cosign.key "${IMAGE_DIGEST}"
+          rm -f cosign.key
+
+      - name: Verify image signature
+        shell: bash
+        run: |
+          cosign verify --key signing/cosign.pub "${IMAGE_DIGEST}"
