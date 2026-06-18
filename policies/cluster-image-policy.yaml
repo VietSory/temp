@@ -1,0 +1,17 @@
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: require-cosign-signature
+spec:
+  mode: enforce
+  images:
+    - glob: "**"
+  authorities:
+    - name: lab-cosign-key
+      key:
+        hashAlgorithm: sha256
+        data: |
+              -----BEGIN PUBLIC KEY-----
+              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQDDm2QTBcm+BH+XMstrENdOGngxd
+              XvGtE5nsm0YsjZpRx380nctoihZVUVwnIXQf7nWy1GckHJVhtyhPJNYQCw==
+              -----END PUBLIC KEY-----
