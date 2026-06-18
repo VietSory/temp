@@ -1,0 +1,18 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sDisallowRootUser
+metadata:
+  name: disallow-root-user
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  enforcementAction: warn
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet", "ReplicaSet"]
+      - apiGroups: ["batch"]
+        kinds: ["Job"]
+      - apiGroups: ["argoproj.io"]
+        kinds: ["Rollout"]
