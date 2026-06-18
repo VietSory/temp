@@ -1,0 +1,31 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sdisallowhostnetwork
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sDisallowHostNetwork
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sdisallowhostnetwork
+
+        import rego.v1
+
+        pod_spec := spec if {
+          input.review.kind.kind == "Pod"
+          spec := input.review.object.spec
+        }
+
+        pod_spec := spec if {
+          spec := input.review.object.spec.template.spec
+        }
+
+        violation contains {"msg": msg} if {
+          pod_spec.hostNetwork == true
+          msg := "hostNetwork: true is not allowed"
+        }

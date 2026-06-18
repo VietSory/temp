@@ -1,0 +1,40 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sdisallowedlatesttag
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sDisallowedLatestTag
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sdisallowedlatesttag
+
+        import rego.v1
+
+        pod_spec := spec if {
+          input.review.kind.kind == "Pod"
+          spec := input.review.object.spec
+        }
+
+        pod_spec := spec if {
+          spec := input.review.object.spec.template.spec
+        }
+
+        containers[container] if {
+          container := pod_spec.containers[_]
+        }
+
+        containers[container] if {
+          container := pod_spec.initContainers[_]
+        }
+
+        violation contains {"msg": msg} if {
+          container := containers[_]
+          endswith(container.image, ":latest")
+          msg := sprintf("container <%s> uses disallowed image tag :latest: <%s>", [container.name, container.image])
+        }
