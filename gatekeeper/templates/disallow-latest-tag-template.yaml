@@ -17,25 +17,24 @@ spec:
       rego: |
         package k8sdisallowedlatesttag
 
-        import rego.v1
-
-        pod_spec := input.review.object.spec if {
+        pod_spec = spec {
           input.review.kind.kind == "Pod"
+          spec := input.review.object.spec
         }
 
-        pod_spec := input.review.object.spec.template.spec if {
-          input.review.object.spec.template.spec
+        pod_spec = spec {
+          spec := input.review.object.spec.template.spec
         }
 
-        containers contains container if {
+        containers[container] {
           container := pod_spec.containers[_]
         }
 
-        containers contains container if {
+        containers[container] {
           container := pod_spec.initContainers[_]
         }
 
-        violation contains {"msg": msg} if {
+        violation[{"msg": msg}] {
           container := containers[_]
           endswith(container.image, ":latest")
           msg := sprintf("container <%s> uses disallowed image tag :latest: <%s>", [container.name, container.image])
