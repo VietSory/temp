@@ -18,10 +18,8 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # Allow same namespace traffic
     - to:
         - podSelector: {}
-    # Allow DNS to kube-system
     - to:
         - namespaceSelector:
             matchLabels:

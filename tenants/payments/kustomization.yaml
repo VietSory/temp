@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - rbac.yaml
+  - rolebinding.yaml
   - quota.yaml
   - limitrange.yaml
   - networkpolicy.yaml
