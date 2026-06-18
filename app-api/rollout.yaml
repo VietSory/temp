@@ -1,5 +1,4 @@
 # Rollout: Progressive delivery với canary strategy
-# Sync wave 0: Deploy trước để tạo pods
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -11,6 +10,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   replicas: 4
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app: api
@@ -20,40 +20,52 @@ spec:
         app: api
     spec:
       containers:
-      - name: api
-        image: nginx:1.27-alpine
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 80
-          protocol: TCP
-        env:
-        - name: VERSION
-          value: "v0.0.1"
-        - name: ERROR_RATE
-          value: "0"
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 5
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 3
-        resources:
-          limits:
-            cpu: 200m
-            memory: 128Mi
+        - name: api
+          image: ghcr.io/vietsory/w10-api:cc7b0d02c91649a5058aaceef82a9ba169ecf7ea
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: VERSION
+              value: "v0.0.1"
+            - name: ERROR_RATE
+              value: "0"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: db-secret
+              mountPath: /etc/db-secret
+              readOnly: true
+      volumes:
+        - name: db-secret
+          secret:
+            secretName: db-secret
   strategy:
     canary:
-      analysis:
-        templates:
-        - templateName: success-rate
-        startingStep: 1
       steps:
-      - setWeight: 10
-      - pause: {duration: 2m}
-      - setWeight: 50
-      - pause: {duration: 2m}
-      - setWeight: 100
+        - setWeight: 10
+        - pause:
+            duration: 30s
+        - setWeight: 50
+        - pause:
+            duration: 30s
+        - setWeight: 100
