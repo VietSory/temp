@@ -1,0 +1,14 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sDeploymentReplicaLimit
+metadata:
+  name: deployment-replica-limit
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment"]
+  parameters:
+    maxReplicas: 5
