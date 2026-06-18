@@ -33,12 +33,12 @@ spec:
           value: "0"
         livenessProbe:
           httpGet:
-            path: /z
+            path: /
             port: 80
           initialDelaySeconds: 5
         readinessProbe:
           httpGet:
-            path: /z
+            path: /
             port: 80
           initialDelaySeconds: 3
         resources:
