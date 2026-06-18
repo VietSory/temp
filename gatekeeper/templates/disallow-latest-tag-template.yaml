@@ -9,6 +9,9 @@ spec:
     spec:
       names:
         kind: K8sDisallowedLatestTag
+      validation:
+        openAPIV3Schema:
+          type: object
   targets:
     - target: admission.k8s.gatekeeper.sh
       rego: |
