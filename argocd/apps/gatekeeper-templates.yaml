@@ -22,4 +22,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - ServerSideApply=truec
+      - ServerSideApply=true

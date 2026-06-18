@@ -16,20 +16,19 @@ spec:
 
         import rego.v1
 
-        pod_spec := spec if {
+        pod_spec := input.review.object.spec if {
           input.review.kind.kind == "Pod"
-          spec := input.review.object.spec
         }
 
-        pod_spec := spec if {
-          spec := input.review.object.spec.template.spec
+        pod_spec := input.review.object.spec.template.spec if {
+          input.review.object.spec.template.spec
         }
 
-        containers[container] if {
+        containers contains container if {
           container := pod_spec.containers[_]
         }
 
-        containers[container] if {
+        containers contains container if {
           container := pod_spec.initContainers[_]
         }
 
