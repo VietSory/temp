@@ -26,6 +26,21 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: cosign-system
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: policy.sigstore.dev
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+        - .webhooks[]?.failurePolicy
+        - .webhooks[]?.timeoutSeconds
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: policy.sigstore.dev
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+        - .webhooks[]?.failurePolicy
+        - .webhooks[]?.timeoutSeconds
   syncPolicy:
     automated:
       prune: true
