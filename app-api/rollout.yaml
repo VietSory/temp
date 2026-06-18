@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/vietsory/w10-api:cc7b0d02c91649a5058aaceef82a9ba169ecf7ea
+          image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
