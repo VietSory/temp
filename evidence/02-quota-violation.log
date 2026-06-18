@@ -1,3 +1,0 @@
-== ResourceQuota violation evidence ==
-This SHOULD be rejected because it exceeds payments quota.
-Error from server (Forbidden): error when creating "/tmp/payments-quota-violation.yaml": pods "quota-violation" is forbidden: exceeded quota: payments-quota, requested: limits.cpu=3,limits.memory=3Gi,requests.cpu=1500m,requests.memory=1500Mi, used: limits.cpu=400m,limits.memory=256Mi,requests.cpu=100m,requests.memory=128Mi, limited: limits.cpu=2,limits.memory=2Gi,requests.cpu=1,requests.memory=1Gi
