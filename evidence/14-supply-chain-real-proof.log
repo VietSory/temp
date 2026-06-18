@@ -1,0 +1,119 @@
+# Evidence 14 - Supply chain admission control
+Generated at: 2026-06-19T00:50:42+07:00
+
+$ kubectl get ns payments --show-labels
+NAME       STATUS   AGE   LABELS
+payments   Active   50m   kubernetes.io/metadata.name=payments,name=payments,policy.sigstore.dev/include=true,team=payments
+
+$ kubectl get clusterimagepolicy -o yaml
+apiVersion: v1
+items:
+- apiVersion: policy.sigstore.dev/v1beta1
+  kind: ClusterImagePolicy
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: policies:policy.sigstore.dev/ClusterImagePolicy:cosign-system/require-cosign-signature
+    creationTimestamp: "2026-06-18T17:01:33Z"
+    finalizers:
+    - clusterimagepolicies.policy.sigstore.dev
+    generation: 1
+    name: require-cosign-signature
+    resourceVersion: "3288"
+    uid: d18747f9-099b-4bdd-b4c5-ee8e6ef8b5b0
+  spec:
+    authorities:
+    - key:
+        data: |
+          -----BEGIN PUBLIC KEY-----
+          MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQDDm2QTBcm+BH+XMstrENdOGngxd
+          XvGtE5nsm0YsjZpRx380nctoihZVUVwnIXQf7nWy1GckHJVhtyhPJNYQCw==
+          -----END PUBLIC KEY-----
+        hashAlgorithm: sha256
+      name: lab-cosign-key
+    images:
+    - glob: '**'
+    mode: enforce
+  status:
+    conditions:
+    - lastTransitionTime: "2026-06-18T17:01:34Z"
+      status: "True"
+      type: ConfigMapUpdated
+    - lastTransitionTime: "2026-06-18T17:01:34Z"
+      status: "True"
+      type: KeysInlined
+    - lastTransitionTime: "2026-06-18T17:01:34Z"
+      status: "True"
+      type: PoliciesInlined
+    - lastTransitionTime: "2026-06-18T17:01:34Z"
+      status: "True"
+      type: Ready
+    observedGeneration: 1
+kind: List
+metadata:
+  resourceVersion: ""
+
+$ kubectl get deploy payments-api -n payments -o jsonpath="{.spec.template.spec.containers[0].image}"
+ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
+
+$ cat /tmp/signed-image-admit-proof.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: signed-image-admit-proof
+  namespace: payments
+spec:
+  restartPolicy: Never
+  containers:
+    - name: signed
+      image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
+      command: ["python", "-c"]
+      args: ["print('SIGNED_IMAGE_ADMITTED')"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+$ kubectl delete pod signed-image-admit-proof -n payments --ignore-not-found
+
+$ kubectl apply -f /tmp/signed-image-admit-proof.yaml
+pod/signed-image-admit-proof created
+
+$ sleep 10
+
+$ kubectl get pod signed-image-admit-proof -n payments -o wide
+NAME                       READY   STATUS      RESTARTS   AGE   IP               NODE   NOMINATED NODE   READINESS GATES
+signed-image-admit-proof   0/1     Completed   0          12s   10.244.251.168   w10    <none>           <none>
+
+$ kubectl logs -n payments signed-image-admit-proof
+SIGNED_IMAGE_ADMITTED
+
+$ kubectl delete pod signed-image-admit-proof -n payments --ignore-not-found
+pod "signed-image-admit-proof" deleted from payments namespace
+
+$ cat /tmp/unsigned-image-reject-proof.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: unsigned-image-reject-proof
+  namespace: payments
+spec:
+  restartPolicy: Never
+  containers:
+    - name: nginx
+      image: nginx:1.27-alpine
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+$ kubectl delete pod unsigned-image-reject-proof -n payments --ignore-not-found
+
+$ kubectl apply -f /tmp/unsigned-image-reject-proof.yaml
+Error from server (BadRequest): error when creating "/tmp/unsigned-image-reject-proof.yaml": admission webhook "policy.sigstore.dev" denied the request: validation failed: failed policy: require-cosign-signature: spec.containers[0].image
+index.docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 signature key validation failed for authority lab-cosign-key for index.docker.io/library/nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10: no signatures found

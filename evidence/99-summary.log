@@ -1,0 +1,145 @@
+# W10 Challenge Evidence Summary
+
+Generated at: 2026-06-19T00:51:13+07:00
+Context: w10
+
+## Evidence files
+evidence/00-final-runtime-check.log
+evidence/01-rbac-isolation.log
+evidence/02-quota-violation.log
+evidence/03-limitrange-default.log
+evidence/04-payments-app-health.log
+evidence/05-netpol-same-namespace-allowed.log
+evidence/06-netpol-cross-namespace-blocked.log
+evidence/07-unsigned-image-rejected.log
+evidence/10-gitops-runtime-proof.log
+evidence/11-rbac-real-forbidden-proof.log
+evidence/12-quota-limitrange-real-proof.log
+evidence/13-networkpolicy-real-proof.log
+evidence/14-supply-chain-real-proof.log
+evidence/99-summary.log
+
+## ArgoCD apps
+NAME                     SYNC STATUS   HEALTH STATUS
+alert                    Synced        Healthy
+analysis                 Synced        Healthy
+api                      Synced        Healthy
+argo-rollouts            Synced        Healthy
+common                   Synced        Healthy
+eso-config               Synced        Healthy
+external-secrets         Synced        Healthy
+gatekeeper               Synced        Healthy
+gatekeeper-constraints   Synced        Healthy
+gatekeeper-templates     Synced        Healthy
+kube-prometheus-stack    Synced        Healthy
+payments                 Synced        Healthy
+payments-app             Synced        Healthy
+policies                 Synced        Healthy
+policy-bootstrap         Synced        Healthy
+policy-controller        OutOfSync     Healthy
+rbac                     Synced        Healthy
+root                     Synced        Healthy
+
+## Runtime baseline
+w10
+payments   Active   48m   kubernetes.io/metadata.name=payments,name=payments,policy.sigstore.dev/include=true,team=payments
+$ kubectl get pods -n kube-system -o wide | egrep -i "calico|coredns|kube-proxy"
+calico-kube-controllers-565c89d6df-c8zzc   1/1     Running   0          55m   10.244.251.129   w10    <none>           <none>
+calico-node-shd5r                          1/1     Running   0          55m   192.168.58.2     w10    <none>           <none>
+coredns-7d764666f9-2sxmh                   1/1     Running   0          55m   10.244.251.130   w10    <none>           <none>
+kube-proxy-jzhgq                           1/1     Running   0          55m   192.168.58.2     w10    <none>           <none>
+deployment.apps/payments-api   2/2     2            2           48m   payments-api   ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681   app=payments-api
+service/payments-api   ClusterIP   10.103.5.178   <none>        80/TCP    48m   app=payments-api
+pod/payments-api-b6fdd44bb-4cr9x   1/1     Running   0          48m   10.244.251.152   w10    <none>           <none>
+pod/payments-api-b6fdd44bb-7pskx   1/1     Running   0          48m   10.244.251.151   w10    <none>           <none>
+pod/api-668b55465b-49j8q   1/1     Running   0          48m   10.244.251.155   w10    <none>           <none>
+pod/api-668b55465b-6g4dj   1/1     Running   0          48m   10.244.251.153   w10    <none>           <none>
+pod/api-668b55465b-c7r8s   1/1     Running   0          48m   10.244.251.154   w10    <none>           <none>
+pod/api-668b55465b-n59gn   1/1     Running   0          48m   10.244.251.156   w10    <none>           <none>
+require-cosign-signature   47m
+$ kubectl get deploy payments-api -n payments -o jsonpath="{.spec.template.spec.containers[0].image}"
+ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
+
+## RBAC proof
+ServiceAccount under test: system:serviceaccount:payments:payments-dev-sa
+  annotations:
+$ kubectl get rolebinding payments-dev-rolebinding -n payments -o yaml
+  annotations:
+    argocd.argoproj.io/tracking-id: payments:rbac.authorization.k8s.io/RoleBinding:payments/payments-dev-rolebinding
+  name: payments-dev-rolebinding
+  name: payments-dev-sa
+$ kubectl auth can-i list pods --as=system:serviceaccount:payments:payments-dev-sa -n payments
+yes
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa get pods -n payments
+$ kubectl auth can-i list pods --as=system:serviceaccount:payments:payments-dev-sa -n demo
+no
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa get pods -n demo
+Error from server (Forbidden): pods is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot list resource "pods" in API group "" in the namespace "demo"
+$ kubectl auth can-i get secrets --as=system:serviceaccount:payments:payments-dev-sa -n payments
+no
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa get secrets -n payments
+Error from server (Forbidden): secrets is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot list resource "secrets" in API group "" in the namespace "payments"
+$ kubectl auth can-i create rolebindings --as=system:serviceaccount:payments:payments-dev-sa -n payments
+no
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa create rolebinding rbac-escalation-test --clusterrole=view --serviceaccount=payments:payments-dev-sa -n payments --dry-run=server -o yaml
+error: failed to create rolebinding: rolebindings.rbac.authorization.k8s.io is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot create resource "rolebindings" in API group "rbac.authorization.k8s.io" in the namespace "payments"
+$ kubectl auth can-i create clusterrolebindings --as=system:serviceaccount:payments:payments-dev-sa
+Warning: resource 'clusterrolebindings' is not namespace scoped in group 'rbac.authorization.k8s.io'
+no
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa create clusterrolebinding crb-escalation-test --clusterrole=cluster-admin --serviceaccount=payments:payments-dev-sa --dry-run=server -o yaml
+error: failed to create clusterrolebinding: clusterrolebindings.rbac.authorization.k8s.io is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot create resource "clusterrolebindings" in API group "rbac.authorization.k8s.io" at the cluster scope
+
+## Quota and LimitRange proof
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: 400m
+    limits.memory: 256Mi
+    requests.cpu: 100m
+    requests.memory: 128Mi
+$ kubectl get limitrange payments-default-limits -n payments -o yaml
+    argocd.argoproj.io/tracking-id: payments:/LimitRange:payments/payments-default-limits
+  name: payments-default-limits
+  limits:
+      cpu: 200m
+      memory: 256Mi
+      cpu: 50m
+      memory: 64Mi
+        requests:
+        limits:
+Error from server (Forbidden): error when creating "/tmp/payments-quota-proof.yaml": pods "quota-violation-proof" is forbidden: exceeded quota: payments-quota, requested: limits.cpu=3,limits.memory=3Gi,requests.cpu=1500m,requests.memory=1500Mi, used: limits.cpu=400m,limits.memory=256Mi,requests.cpu=100m,requests.memory=128Mi, limited: limits.cpu=2,limits.memory=2Gi,requests.cpu=1,requests.memory=1Gi
+{"limits":{"cpu":"200m","memory":"256Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}
+
+## NetworkPolicy proof
+$ kubectl get pods -n kube-system -o wide | egrep -i "calico|coredns|kube-proxy"
+calico-kube-controllers-565c89d6df-c8zzc   1/1     Running   0          56m   10.244.251.129   w10    <none>           <none>
+calico-node-shd5r                          1/1     Running   0          56m   192.168.58.2     w10    <none>           <none>
+payments-allow-same-ns-ingress    <none>         37m
+payments-default-deny-ingress     <none>         49m
+payments-egress-same-ns-and-dns   <none>         49m
+      argocd.argoproj.io/tracking-id: payments:networking.k8s.io/NetworkPolicy:payments/payments-allow-same-ns-ingress
+    name: payments-allow-same-ns-ingress
+      argocd.argoproj.io/tracking-id: payments:networking.k8s.io/NetworkPolicy:payments/payments-default-deny-ingress
+    name: payments-default-deny-ingress
+      argocd.argoproj.io/tracking-id: payments:networking.k8s.io/NetworkPolicy:payments/payments-egress-same-ns-and-dns
+    name: payments-egress-same-ns-and-dns
+{"ok":true,"version":"payments-v1"}
+              print("BLOCKED_OR_TIMEOUT")
+BLOCKED_OR_TIMEOUT
+URLError: <urlopen error timed out>
+
+## Supply chain proof
+payments   Active   50m   kubernetes.io/metadata.name=payments,name=payments,policy.sigstore.dev/include=true,team=payments
+- apiVersion: policy.sigstore.dev/v1beta1
+      argocd.argoproj.io/tracking-id: policies:policy.sigstore.dev/ClusterImagePolicy:cosign-system/require-cosign-signature
+    - clusterimagepolicies.policy.sigstore.dev
+    name: require-cosign-signature
+      args: ["print('SIGNED_IMAGE_ADMITTED')"]
+SIGNED_IMAGE_ADMITTED
+Error from server (BadRequest): error when creating "/tmp/unsigned-image-reject-proof.yaml": admission webhook "policy.sigstore.dev" denied the request: validation failed: failed policy: require-cosign-signature: spec.containers[0].image
+index.docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 signature key validation failed for authority lab-cosign-key for index.docker.io/library/nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10: no signatures found

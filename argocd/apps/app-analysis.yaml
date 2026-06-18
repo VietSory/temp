@@ -9,9 +9,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Vuong-Bach/temp.git
+    repoURL: https://github.com/VietSory/temp.git
     path: app-analysis
-    targetRevision: main
+    targetRevision: lab-2-1-eso
   destination:
     server: https://kubernetes.default.svc
     namespace: demo

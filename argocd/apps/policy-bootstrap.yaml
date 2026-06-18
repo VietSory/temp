@@ -1,23 +1,22 @@
-# ArgoCD App: Deploy API Rollout + Service + ServiceMonitor
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: api
+  name: policy-bootstrap
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "55"
 spec:
   project: default
   source:
     repoURL: https://github.com/VietSory/temp.git
-    path: app-api
     targetRevision: lab-2-1-eso
+    path: policy-bootstrap
   destination:
     server: https://kubernetes.default.svc
-    namespace: demo
+    namespace: cosign-system
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-    - ServerSideApply=true
+      - ServerSideApply=true

@@ -1,0 +1,31 @@
+name: Trivy Fail Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - lab-2-1-eso
+    paths:
+      - ".github/workflows/trivy-fail-test.yml"
+      - "trivy-fail-trigger.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  trivy-fail-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pull vulnerable image
+        run: docker pull python:3.8-buster
+
+      - name: Trivy should fail on HIGH/CRITICAL CVEs
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: python:3.8-buster
+          format: table
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          ignore-unfixed: false

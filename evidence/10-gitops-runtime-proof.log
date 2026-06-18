@@ -1,0 +1,90 @@
+# Evidence 10 - GitOps runtime baseline
+Generated at: 2026-06-19T00:48:34+07:00
+
+$ kubectl config current-context
+w10
+
+$ kubectl get application -n argocd
+NAME                     SYNC STATUS   HEALTH STATUS
+alert                    Synced        Healthy
+analysis                 Synced        Healthy
+api                      Synced        Healthy
+argo-rollouts            Synced        Healthy
+common                   Synced        Healthy
+eso-config               Synced        Healthy
+external-secrets         Synced        Healthy
+gatekeeper               Synced        Healthy
+gatekeeper-constraints   Synced        Healthy
+gatekeeper-templates     Synced        Healthy
+kube-prometheus-stack    Synced        Healthy
+payments                 Synced        Healthy
+payments-app             Synced        Healthy
+policies                 Synced        Healthy
+policy-bootstrap         Synced        Healthy
+policy-controller        OutOfSync     Healthy
+rbac                     Synced        Healthy
+root                     Synced        Healthy
+
+$ kubectl get ns demo payments --show-labels
+NAME       STATUS   AGE   LABELS
+demo       Active   49m   kubernetes.io/metadata.name=demo
+payments   Active   48m   kubernetes.io/metadata.name=payments,name=payments,policy.sigstore.dev/include=true,team=payments
+
+$ kubectl get pods -n kube-system -o wide | egrep -i "calico|coredns|kube-proxy"
+calico-kube-controllers-565c89d6df-c8zzc   1/1     Running   0          55m   10.244.251.129   w10    <none>           <none>
+calico-node-shd5r                          1/1     Running   0          55m   192.168.58.2     w10    <none>           <none>
+coredns-7d764666f9-2sxmh                   1/1     Running   0          55m   10.244.251.130   w10    <none>           <none>
+kube-proxy-jzhgq                           1/1     Running   0          55m   192.168.58.2     w10    <none>           <none>
+
+$ kubectl get deploy,svc,pod -n payments -o wide
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS     IMAGES                                                                                                                                      SELECTOR
+deployment.apps/payments-api   2/2     2            2           48m   payments-api   ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681   app=payments-api
+
+NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/payments-api   ClusterIP   10.103.5.178   <none>        80/TCP    48m   app=payments-api
+
+NAME                               READY   STATUS    RESTARTS   AGE   IP               NODE   NOMINATED NODE   READINESS GATES
+pod/payments-api-b6fdd44bb-4cr9x   1/1     Running   0          48m   10.244.251.152   w10    <none>           <none>
+pod/payments-api-b6fdd44bb-7pskx   1/1     Running   0          48m   10.244.251.151   w10    <none>           <none>
+
+$ kubectl get rollout,svc,pod -n demo -o wide
+NAME                      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+rollout.argoproj.io/api   4         4         4            4           48m
+
+NAME          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/api   ClusterIP   10.108.129.47   <none>        80/TCP    48m   app=api
+
+NAME                       READY   STATUS    RESTARTS   AGE   IP               NODE   NOMINATED NODE   READINESS GATES
+pod/api-668b55465b-49j8q   1/1     Running   0          48m   10.244.251.155   w10    <none>           <none>
+pod/api-668b55465b-6g4dj   1/1     Running   0          48m   10.244.251.153   w10    <none>           <none>
+pod/api-668b55465b-c7r8s   1/1     Running   0          48m   10.244.251.154   w10    <none>           <none>
+pod/api-668b55465b-n59gn   1/1     Running   0          48m   10.244.251.156   w10    <none>           <none>
+
+$ kubectl get networkpolicy,resourcequota,limitrange,role,rolebinding,sa -n payments -o wide
+NAME                                                              POD-SELECTOR   AGE
+networkpolicy.networking.k8s.io/payments-allow-same-ns-ingress    <none>         36m
+networkpolicy.networking.k8s.io/payments-default-deny-ingress     <none>         48m
+networkpolicy.networking.k8s.io/payments-egress-same-ns-and-dns   <none>         48m
+
+NAME                           REQUEST                                                                       LIMIT                                          AGE
+resourcequota/payments-quota   pods: 2/10, requests.cpu: 100m/1, requests.memory: 128Mi/1Gi, services: 1/5   limits.cpu: 400m/2, limits.memory: 256Mi/2Gi   48m
+
+NAME                                 CREATED AT
+limitrange/payments-default-limits   2026-06-18T17:00:27Z
+
+NAME                                               CREATED AT
+role.rbac.authorization.k8s.io/payments-dev-role   2026-06-18T17:00:28Z
+
+NAME                                                             ROLE                     AGE   USERS   GROUPS   SERVICEACCOUNTS
+rolebinding.rbac.authorization.k8s.io/payments-dev-rolebinding   Role/payments-dev-role   48m                    payments/payments-dev-sa
+
+NAME                             AGE
+serviceaccount/default           48m
+serviceaccount/payments-dev-sa   48m
+
+$ kubectl get clusterimagepolicy -o wide
+NAME                       AGE
+require-cosign-signature   47m
+
+$ kubectl get deploy payments-api -n payments -o jsonpath="{.spec.template.spec.containers[0].image}"
+ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681

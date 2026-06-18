@@ -1,0 +1,112 @@
+# Evidence 12 - ResourceQuota and LimitRange
+Generated at: 2026-06-19T00:48:52+07:00
+
+$ kubectl get resourcequota payments-quota -n payments -o yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: payments:/ResourceQuota:payments/payments-quota
+  creationTimestamp: "2026-06-18T17:00:27Z"
+  name: payments-quota
+  namespace: payments
+  resourceVersion: "5370"
+  uid: 7e555103-1ba8-48ab-b130-7075adc2cb62
+spec:
+  hard:
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "10"
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    services: "5"
+status:
+  hard:
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "10"
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    services: "5"
+  used:
+    limits.cpu: 400m
+    limits.memory: 256Mi
+    pods: "2"
+    requests.cpu: 100m
+    requests.memory: 128Mi
+    services: "1"
+
+$ kubectl get limitrange payments-default-limits -n payments -o yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: payments:/LimitRange:payments/payments-default-limits
+  creationTimestamp: "2026-06-18T17:00:27Z"
+  name: payments-default-limits
+  namespace: payments
+  resourceVersion: "2881"
+  uid: 2be85108-169a-4da2-91b9-57261e414f6b
+spec:
+  limits:
+  - default:
+      cpu: 200m
+      memory: 256Mi
+    defaultRequest:
+      cpu: 50m
+      memory: 64Mi
+    type: Container
+
+$ cat /tmp/payments-quota-proof.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quota-violation-proof
+  namespace: payments
+spec:
+  restartPolicy: Never
+  containers:
+    - name: quota-violation-proof
+      image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
+      command: ["python", "-c"]
+      args: ["import time; time.sleep(3600)"]
+      resources:
+        requests:
+          cpu: "1500m"
+          memory: 1500Mi
+        limits:
+          cpu: "3"
+          memory: 3Gi
+
+$ kubectl delete pod quota-violation-proof -n payments --ignore-not-found
+
+$ kubectl apply -f /tmp/payments-quota-proof.yaml
+Error from server (Forbidden): error when creating "/tmp/payments-quota-proof.yaml": pods "quota-violation-proof" is forbidden: exceeded quota: payments-quota, requested: limits.cpu=3,limits.memory=3Gi,requests.cpu=1500m,requests.memory=1500Mi, used: limits.cpu=400m,limits.memory=256Mi,requests.cpu=100m,requests.memory=128Mi, limited: limits.cpu=2,limits.memory=2Gi,requests.cpu=1,requests.memory=1Gi
+
+$ cat /tmp/payments-limitrange-proof.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: limitrange-default-proof
+  namespace: payments
+spec:
+  restartPolicy: Never
+  containers:
+    - name: check
+      image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
+      command: ["python", "-c"]
+      args: ["import time; time.sleep(3600)"]
+
+$ kubectl delete pod limitrange-default-proof -n payments --ignore-not-found
+
+$ kubectl apply -f /tmp/payments-limitrange-proof.yaml
+pod/limitrange-default-proof created
+
+$ kubectl wait --for=condition=Ready pod/limitrange-default-proof -n payments --timeout=120s
+pod/limitrange-default-proof condition met
+
+$ kubectl get pod limitrange-default-proof -n payments -o jsonpath="{.spec.containers[0].resources}"
+{"limits":{"cpu":"200m","memory":"256Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}
+
+$ kubectl delete pod limitrange-default-proof -n payments --ignore-not-found
+pod "limitrange-default-proof" deleted from payments namespace
