@@ -1,0 +1,178 @@
+# Evidence 13 - NetworkPolicy enforced by Calico
+Generated at: 2026-06-19T00:49:55+07:00
+
+$ kubectl get pods -n kube-system -o wide | egrep -i "calico|coredns|kube-proxy"
+calico-kube-controllers-565c89d6df-c8zzc   1/1     Running   0          56m   10.244.251.129   w10    <none>           <none>
+calico-node-shd5r                          1/1     Running   0          56m   192.168.58.2     w10    <none>           <none>
+coredns-7d764666f9-2sxmh                   1/1     Running   0          56m   10.244.251.130   w10    <none>           <none>
+kube-proxy-jzhgq                           1/1     Running   0          56m   192.168.58.2     w10    <none>           <none>
+
+$ kubectl get networkpolicy -n payments -o wide
+NAME                              POD-SELECTOR   AGE
+payments-allow-same-ns-ingress    <none>         37m
+payments-default-deny-ingress     <none>         49m
+payments-egress-same-ns-and-dns   <none>         49m
+
+$ kubectl get networkpolicy -n payments -o yaml
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "20"
+      argocd.argoproj.io/tracking-id: payments:networking.k8s.io/NetworkPolicy:payments/payments-allow-same-ns-ingress
+    creationTimestamp: "2026-06-18T17:12:13Z"
+    generation: 1
+    name: payments-allow-same-ns-ingress
+    namespace: payments
+    resourceVersion: "5115"
+    uid: 8bde9928-bd3c-440c-a4de-518af60c840f
+  spec:
+    ingress:
+    - from:
+      - podSelector: {}
+    podSelector: {}
+    policyTypes:
+    - Ingress
+- apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: payments:networking.k8s.io/NetworkPolicy:payments/payments-default-deny-ingress
+    creationTimestamp: "2026-06-18T17:00:26Z"
+    generation: 1
+    name: payments-default-deny-ingress
+    namespace: payments
+    resourceVersion: "2867"
+    uid: 6ef4e66b-72b9-4313-955c-49354b50995d
+  spec:
+    podSelector: {}
+    policyTypes:
+    - Ingress
+- apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: payments:networking.k8s.io/NetworkPolicy:payments/payments-egress-same-ns-and-dns
+    creationTimestamp: "2026-06-18T17:00:26Z"
+    generation: 1
+    name: payments-egress-same-ns-and-dns
+    namespace: payments
+    resourceVersion: "2869"
+    uid: ecdd3ddb-4e91-48fd-a82b-a56bd24cd9a1
+  spec:
+    egress:
+    - to:
+      - podSelector: {}
+    - ports:
+      - port: 53
+        protocol: UDP
+      - port: 53
+        protocol: TCP
+      to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+    podSelector: {}
+    policyTypes:
+    - Egress
+kind: List
+metadata:
+  resourceVersion: ""
+
+$ kubectl get svc -n payments -o wide
+NAME           TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+payments-api   ClusterIP   10.103.5.178   <none>        80/TCP    49m   app=payments-api
+
+$ kubectl get svc -n demo -o wide
+NAME   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+api    ClusterIP   10.108.129.47   <none>        80/TCP    50m   app=api
+
+$ cat /tmp/netpol-same-namespace-proof.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netpol-same-namespace-proof
+  namespace: payments
+spec:
+  restartPolicy: Never
+  containers:
+    - name: client
+      image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
+      command: ["python", "-c"]
+      args:
+        - |
+          import urllib.request
+          print(urllib.request.urlopen("http://payments-api.payments.svc.cluster.local/", timeout=5).read().decode())
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+$ kubectl delete pod netpol-same-namespace-proof -n payments --ignore-not-found
+
+$ kubectl apply -f /tmp/netpol-same-namespace-proof.yaml
+pod/netpol-same-namespace-proof created
+
+$ sleep 12
+
+$ kubectl get pod netpol-same-namespace-proof -n payments -o wide
+NAME                          READY   STATUS      RESTARTS   AGE   IP               NODE   NOMINATED NODE   READINESS GATES
+netpol-same-namespace-proof   0/1     Completed   0          13s   10.244.251.166   w10    <none>           <none>
+
+$ kubectl logs -n payments netpol-same-namespace-proof
+{"ok":true,"version":"payments-v1"}
+
+
+$ kubectl delete pod netpol-same-namespace-proof -n payments --ignore-not-found
+pod "netpol-same-namespace-proof" deleted from payments namespace
+
+$ cat /tmp/netpol-cross-namespace-proof.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netpol-cross-namespace-proof
+  namespace: payments
+spec:
+  restartPolicy: Never
+  containers:
+    - name: client
+      image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
+      command: ["python", "-c"]
+      args:
+        - |
+          import urllib.request
+          try:
+              print(urllib.request.urlopen("http://api.demo.svc.cluster.local/", timeout=5).read().decode())
+          except Exception as e:
+              print("BLOCKED_OR_TIMEOUT")
+              print(type(e).__name__ + ": " + str(e))
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+$ kubectl delete pod netpol-cross-namespace-proof -n payments --ignore-not-found
+
+$ kubectl apply -f /tmp/netpol-cross-namespace-proof.yaml
+pod/netpol-cross-namespace-proof created
+
+$ sleep 12
+
+$ kubectl get pod netpol-cross-namespace-proof -n payments -o wide
+NAME                           READY   STATUS      RESTARTS   AGE   IP               NODE   NOMINATED NODE   READINESS GATES
+netpol-cross-namespace-proof   0/1     Completed   0          13s   10.244.251.167   w10    <none>           <none>
+
+$ kubectl logs -n payments netpol-cross-namespace-proof
+BLOCKED_OR_TIMEOUT
+URLError: <urlopen error timed out>
+
+$ kubectl delete pod netpol-cross-namespace-proof -n payments --ignore-not-found
+pod "netpol-cross-namespace-proof" deleted from payments namespace

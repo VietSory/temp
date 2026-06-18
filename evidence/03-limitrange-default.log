@@ -1,0 +1,11 @@
+== LimitRange default evidence ==
+pod/limitrange-default-check created
+
+== Wait pod admitted ==
+pod/limitrange-default-check condition met
+
+== Effective resources after admission ==
+{"limits":{"cpu":"200m","memory":"256Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}
+
+== Cleanup ==
+pod "limitrange-default-check" deleted from payments namespace

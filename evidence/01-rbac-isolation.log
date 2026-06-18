@@ -1,0 +1,16 @@
+== RBAC isolation evidence ==
+
+Can payments service account list pods in payments? Expected: yes
+yes
+
+Can payments service account list pods in demo? Expected: no
+no
+
+Can payments service account get secrets in payments? Expected: no
+no
+
+Can payments service account create rolebindings in payments? Expected: no
+no
+
+Can payments service account create clusterrolebindings? Expected: no
+no

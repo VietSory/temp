@@ -1,0 +1,4 @@
+== Unsigned image rejection evidence ==
+This SHOULD be rejected by policy-controller.
+Error from server (BadRequest): error when creating "/tmp/payments-unsigned-image.yaml": admission webhook "policy.sigstore.dev" denied the request: validation failed: failed policy: require-cosign-signature: spec.containers[0].image
+index.docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 signature key validation failed for authority lab-cosign-key for index.docker.io/library/nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10: no signatures found

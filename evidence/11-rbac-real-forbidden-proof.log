@@ -1,0 +1,109 @@
+# Evidence 11 - RBAC isolation with real allow/forbidden commands
+Generated at: 2026-06-19T00:48:42+07:00
+ServiceAccount under test: system:serviceaccount:payments:payments-dev-sa
+
+$ kubectl get role payments-dev-role -n payments -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: payments:rbac.authorization.k8s.io/Role:payments/payments-dev-role
+  creationTimestamp: "2026-06-18T17:00:28Z"
+  name: payments-dev-role
+  namespace: payments
+  resourceVersion: "2893"
+  uid: 4a4490d0-2916-43bd-97ab-1a6a84e74d00
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - argoproj.io
+  resources:
+  - rollouts
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+$ kubectl get rolebinding payments-dev-rolebinding -n payments -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: payments:rbac.authorization.k8s.io/RoleBinding:payments/payments-dev-rolebinding
+  creationTimestamp: "2026-06-18T17:00:28Z"
+  name: payments-dev-rolebinding
+  namespace: payments
+  resourceVersion: "2897"
+  uid: b60cc474-d1ea-4dd1-94cb-277343302add
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: payments-dev-role
+subjects:
+- kind: ServiceAccount
+  name: payments-dev-sa
+  namespace: payments
+
+$ kubectl auth can-i list pods --as=system:serviceaccount:payments:payments-dev-sa -n payments
+yes
+
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa get pods -n payments
+NAME                           READY   STATUS    RESTARTS   AGE
+payments-api-b6fdd44bb-4cr9x   1/1     Running   0          48m
+payments-api-b6fdd44bb-7pskx   1/1     Running   0          48m
+
+$ kubectl auth can-i list pods --as=system:serviceaccount:payments:payments-dev-sa -n demo
+no
+
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa get pods -n demo
+Error from server (Forbidden): pods is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot list resource "pods" in API group "" in the namespace "demo"
+
+$ kubectl auth can-i get secrets --as=system:serviceaccount:payments:payments-dev-sa -n payments
+no
+
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa get secrets -n payments
+Error from server (Forbidden): secrets is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot list resource "secrets" in API group "" in the namespace "payments"
+
+$ kubectl auth can-i create rolebindings --as=system:serviceaccount:payments:payments-dev-sa -n payments
+no
+
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa create rolebinding rbac-escalation-test --clusterrole=view --serviceaccount=payments:payments-dev-sa -n payments --dry-run=server -o yaml
+error: failed to create rolebinding: rolebindings.rbac.authorization.k8s.io is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot create resource "rolebindings" in API group "rbac.authorization.k8s.io" in the namespace "payments"
+
+$ kubectl auth can-i create clusterrolebindings --as=system:serviceaccount:payments:payments-dev-sa
+Warning: resource 'clusterrolebindings' is not namespace scoped in group 'rbac.authorization.k8s.io'
+
+no
+
+$ kubectl --as=system:serviceaccount:payments:payments-dev-sa create clusterrolebinding crb-escalation-test --clusterrole=cluster-admin --serviceaccount=payments:payments-dev-sa --dry-run=server -o yaml
+error: failed to create clusterrolebinding: clusterrolebindings.rbac.authorization.k8s.io is forbidden: User "system:serviceaccount:payments:payments-dev-sa" cannot create resource "clusterrolebindings" in API group "rbac.authorization.k8s.io" at the cluster scope
