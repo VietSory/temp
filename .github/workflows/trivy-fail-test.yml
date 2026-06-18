@@ -2,6 +2,12 @@ name: Trivy Fail Test
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - lab-2-1-eso
+    paths:
+      - ".github/workflows/trivy-fail-test.yml"
+      - "trivy-fail-trigger.txt"
 
 permissions:
   contents: read
