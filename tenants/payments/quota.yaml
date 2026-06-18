@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ResourceQuota
 metadata:
-  name: payments-dev-quota
-  namespace: payments-dev
+  name: payments-quota
+  namespace: payments
 spec:
   hard:
     requests.cpu: "1"

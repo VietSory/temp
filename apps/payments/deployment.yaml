@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payments-api
-  namespace: payments-dev
+  namespace: payments
   labels:
     app: payments-api
 spec:

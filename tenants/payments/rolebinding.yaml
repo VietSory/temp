@@ -2,11 +2,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: payments-dev-rolebinding
-  namespace: payments-dev
+  namespace: payments
 subjects:
   - kind: ServiceAccount
     name: payments-dev-sa
-    namespace: payments-dev
+    namespace: payments
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

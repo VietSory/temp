@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: payments-dev-default-deny-ingress
-  namespace: payments-dev
+  name: payments-default-deny-ingress
+  namespace: payments
 spec:
   podSelector: {}
   policyTypes:
@@ -11,15 +11,17 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: payments-dev-egress-same-ns-and-dns
-  namespace: payments-dev
+  name: payments-egress-same-ns-and-dns
+  namespace: payments
 spec:
   podSelector: {}
   policyTypes:
     - Egress
   egress:
+    # Allow same namespace traffic
     - to:
         - podSelector: {}
+    # Allow DNS to kube-system
     - to:
         - namespaceSelector:
             matchLabels:
