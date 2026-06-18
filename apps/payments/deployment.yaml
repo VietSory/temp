@@ -18,7 +18,7 @@ spec:
       serviceAccountName: payments-dev-sa
       containers:
         - name: payments-api
-          image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782
+          image: ghcr.io/vietsory/w10-api:e74ceb2f257357ba989dd3165c88603a74bad782@sha256:dc5a780a616ec06b965f402c59f939fb504038670901f2c05da6797137623681
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
