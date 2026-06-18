@@ -60,7 +60,9 @@ jobs:
           echo "Pushed digest: ${DIGEST}"
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@main
+        uses: sigstore/cosign-installer@v4.1.0
+        with:
+          cosign-release: 'v2.6.1'
 
       - name: Sign image digest
         shell: bash
