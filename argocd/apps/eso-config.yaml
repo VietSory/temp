@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/VietSory/temp.git
-    targetRevision: HEAD
+    targetRevision: lab-2-1-eso
     path: eso
   destination:
     server: https://kubernetes.default.svc
