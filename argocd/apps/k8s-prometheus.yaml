@@ -1,116 +1,99 @@
-# ArgoCD App: Deploy Prometheus + Alertmanager + Grafana stack
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kube-prometheus-stack
-  namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
+  name: kube-prometheus-stack
+  namespace: argocd
 spec:
+        prometheusOperator:
+          admissionWebhooks:
+            patch:
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+
+  destination:
+    namespace: monitoring
+    server: https://kubernetes.default.svc
   project: default
   source:
-    repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack
-    targetRevision: 65.1.1
     helm:
-      values: |
-        prometheus:
-          prometheusSpec:
-            serviceMonitorSelectorNilUsesHelmValues: false
-
-        alertmanager:
-          config:
-            global:
-              resolve_timeout: 5m
-            route:
-              group_by: ['alertname', 'severity']
-              group_wait: 10s
-              group_interval: 5m
-              repeat_interval: 12h
-              receiver: 'email-notifications'
-              routes:
-              - receiver: 'null'
-                matchers:
-                - alertname = "Watchdog"
-            receivers:
-            - name: 'null'
-            - name: 'email-notifications'
-              email_configs:
-              - to: 'vuongbachdoan@gmail.com'
-                from: 'vuongbachdoan@gmail.com'
-                smarthost: 'smtp.gmail.com:587'
-                auth_username: 'vuongbachdoan@gmail.com'
-                auth_password_file: /etc/alertmanager/secrets/alertmanager-email/password
-                require_tls: true
-                headers:
-                  Subject: '🚨 [W10 Demo Alert] {{ .GroupLabels.alertname }} - {{ .GroupLabels.severity }}'
-                html: |
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <style>
-                      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                      .header { background: linear-gradient(135deg, #f59e0b, #ef4444); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
-                      .header h1 { margin: 0; font-size: 24px; }
-                      .alert-box { background: #fff; border: 2px solid #e2e8f0; border-radius: 0 0 8px 8px; padding: 20px; }
-                      .alert-critical { border-left: 5px solid #ef4444; background: #fef2f2; padding: 15px; margin: 10px 0; border-radius: 4px; }
-                      .alert-warning { border-left: 5px solid #f59e0b; background: #fffbeb; padding: 15px; margin: 10px 0; border-radius: 4px; }
-                      .label { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; margin: 5px 5px 5px 0; }
-                      .label-critical { background: #ef4444; color: white; }
-                      .label-warning { background: #f59e0b; color: white; }
-                      .metric { font-family: 'Courier New', monospace; background: #f8fafc; padding: 10px; border-radius: 4px; margin: 10px 0; }
-                      .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="container">
-                      <div class="header">
-                        <h1>🚨 Alert Notification</h1>
-                        <p style="margin: 5px 0 0 0; opacity: 0.9;">W10 Demo - Kubernetes Monitoring</p>
-                      </div>
-                      <div class="alert-box">
-                        {{ range .Alerts }}
-                        <div class="alert-{{ .Labels.severity }}">
-                          <h2 style="margin-top: 0; color: #1e293b;">
-                            {{ if eq .Labels.severity "critical" }}🔴{{ else }}⚠️{{ end }}
-                            {{ .Labels.alertname }}
-                          </h2>
-                          <p><strong>Severity:</strong>
-                            <span class="label label-{{ .Labels.severity }}">{{ .Labels.severity | toUpper }}</span>
-                          </p>
-                          <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
-                          <p><strong>Description:</strong> {{ .Annotations.description }}</p>
-                          <div class="metric">
-                            <strong>Status:</strong> {{ .Status }}<br>
-                            <strong>Started:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}<br>
-                            {{ if .EndsAt }}
-                            <strong>Ended:</strong> {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}
-                            {{ end }}
-                          </div>
-                          {{ if .Labels.namespace }}
-                          <p><strong>Namespace:</strong> <code>{{ .Labels.namespace }}</code></p>
-                          {{ end }}
-                          {{ if .Labels.pod }}
-                          <p><strong>Pod:</strong> <code>{{ .Labels.pod }}</code></p>
-                          {{ end }}
-                        </div>
-                        {{ end }}
-                        <div class="footer">
-                          <p>This is an automated alert from W10 Demo Monitoring System</p>
-                          <p>Powered by Prometheus + AlertManager + Kubernetes</p>
-                        </div>
-                      </div>
-                    </div>
-                  </body>
-                  </html>
-
-          alertmanagerSpec:
-            secrets:
-            - alertmanager-email
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring
+      parameters:
+      - forceString: true
+        name: prometheusOperator.admissionWebhooks.patch.resources.requests.cpu
+        value: 10m
+      - forceString: true
+        name: prometheusOperator.admissionWebhooks.patch.resources.requests.memory
+        value: 32Mi
+      - forceString: true
+        name: prometheusOperator.admissionWebhooks.patch.resources.limits.cpu
+        value: 100m
+      - forceString: true
+        name: prometheusOperator.admissionWebhooks.patch.resources.limits.memory
+        value: 128Mi
+      values: "prometheus:\n  prometheusSpec:\n    serviceMonitorSelectorNilUsesHelmValues:
+        false\n\nalertmanager:\n  config:\n    global:\n      resolve_timeout: 5m\n
+        \   route:\n      group_by: ['alertname', 'severity']\n      group_wait: 10s\n
+        \     group_interval: 5m\n      repeat_interval: 12h\n      receiver: 'email-notifications'\n
+        \     routes:\n      - receiver: 'null'\n        matchers:\n        - alertname
+        = \"Watchdog\"\n    receivers:\n    - name: 'null'\n    - name: 'email-notifications'\n
+        \     email_configs:\n      - to: 'vuongbachdoan@gmail.com'\n        from:
+        'vuongbachdoan@gmail.com'\n        smarthost: 'smtp.gmail.com:587'\n        auth_username:
+        'vuongbachdoan@gmail.com'\n        auth_password_file: /etc/alertmanager/secrets/alertmanager-email/password\n
+        \       require_tls: true\n        headers:\n          Subject: '\U0001F6A8
+        [W10 Demo Alert] {{ .GroupLabels.alertname }} - {{ .GroupLabels.severity }}'\n
+        \       html: |\n          <!DOCTYPE html>\n          <html>\n          <head>\n
+        \           <style>\n              body { font-family: Arial, sans-serif;
+        line-height: 1.6; color: #333; }\n              .container { max-width: 600px;
+        margin: 0 auto; padding: 20px; }\n              .header { background: linear-gradient(135deg,
+        #f59e0b, #ef4444); color: white; padding: 20px; border-radius: 8px 8px 0 0;
+        }\n              .header h1 { margin: 0; font-size: 24px; }\n              .alert-box
+        { background: #fff; border: 2px solid #e2e8f0; border-radius: 0 0 8px 8px;
+        padding: 20px; }\n              .alert-critical { border-left: 5px solid #ef4444;
+        background: #fef2f2; padding: 15px; margin: 10px 0; border-radius: 4px; }\n
+        \             .alert-warning { border-left: 5px solid #f59e0b; background:
+        #fffbeb; padding: 15px; margin: 10px 0; border-radius: 4px; }\n              .label
+        { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size:
+        12px; font-weight: bold; margin: 5px 5px 5px 0; }\n              .label-critical
+        { background: #ef4444; color: white; }\n              .label-warning { background:
+        #f59e0b; color: white; }\n              .metric { font-family: 'Courier New',
+        monospace; background: #f8fafc; padding: 10px; border-radius: 4px; margin:
+        10px 0; }\n              .footer { margin-top: 20px; padding-top: 20px; border-top:
+        1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }\n
+        \           </style>\n          </head>\n          <body>\n            <div
+        class=\"container\">\n              <div class=\"header\">\n                <h1>\U0001F6A8
+        Alert Notification</h1>\n                <p style=\"margin: 5px 0 0 0; opacity:
+        0.9;\">W10 Demo - Kubernetes Monitoring</p>\n              </div>\n              <div
+        class=\"alert-box\">\n                {{ range .Alerts }}\n                <div
+        class=\"alert-{{ .Labels.severity }}\">\n                  <h2 style=\"margin-top:
+        0; color: #1e293b;\">\n                    {{ if eq .Labels.severity \"critical\"
+        }}\U0001F534{{ else }}⚠️{{ end }}\n                    {{ .Labels.alertname
+        }}\n                  </h2>\n                  <p><strong>Severity:</strong>\n
+        \                   <span class=\"label label-{{ .Labels.severity }}\">{{
+        .Labels.severity | toUpper }}</span>\n                  </p>\n                  <p><strong>Summary:</strong>
+        {{ .Annotations.summary }}</p>\n                  <p><strong>Description:</strong>
+        {{ .Annotations.description }}</p>\n                  <div class=\"metric\">\n
+        \                   <strong>Status:</strong> {{ .Status }}<br>\n                    <strong>Started:</strong>
+        {{ .StartsAt.Format \"2006-01-02 15:04:05 MST\" }}<br>\n                    {{
+        if .EndsAt }}\n                    <strong>Ended:</strong> {{ .EndsAt.Format
+        \"2006-01-02 15:04:05 MST\" }}\n                    {{ end }}\n                  </div>\n
+        \                 {{ if .Labels.namespace }}\n                  <p><strong>Namespace:</strong>
+        <code>{{ .Labels.namespace }}</code></p>\n                  {{ end }}\n                  {{
+        if .Labels.pod }}\n                  <p><strong>Pod:</strong> <code>{{ .Labels.pod
+        }}</code></p>\n                  {{ end }}\n                </div>\n                {{
+        end }}\n                <div class=\"footer\">\n                  <p>This
+        is an automated alert from W10 Demo Monitoring System</p>\n                  <p>Powered
+        by Prometheus + AlertManager + Kubernetes</p>\n                </div>\n              </div>\n
+        \           </div>\n          </body>\n          </html>\n\n  alertmanagerSpec:\n
+        \   secrets:\n    - alertmanager-email\n"
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 65.1.1
   syncPolicy:
     automated:
       prune: true
